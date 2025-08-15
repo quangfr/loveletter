@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Love Letter – Solo vs IA</title>
+<style>
+  :root{
+    --bg:#0f1226; --panel:#171a36; --panel2:#1e2147; --accent:#ffd166; --accent2:#06d6a0; --danger:#ef476f; --muted:#aab; --text:#f2f5ff;
+    --back1:#0f1231; --back2:#1b1e44; --backBorder:#3a45a6;
+  }
+  html,body{height:100%}
+  body{margin:0;background: radial-gradient(1200px 800px at 70% -10%, #253168, var(--bg));color:var(--text);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:14px 18px;background:linear-gradient(180deg,#1b1e44,#121433);position:sticky;top:0;z-index:10;border-bottom:1px solid #2a2f63}
+  h1{font-size:18px;margin:0;letter-spacing:.5px}
+  .badge{display:inline-block;background:var(--accent2);color:#001e12;font-weight:700;border-radius:999px;padding:2px 8px;margin-left:8px}
+  main{max-width:1100px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:300px 1fr}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid #2b305f;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .left{padding:14px;display:flex;flex-direction:column;gap:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .controls button,.controls select,.controls input[type="range"]{background:#2a2f63;color:var(--text);border:1px solid #39408a;border-radius:10px;padding:10px 12px;font-weight:600;cursor:pointer}
+  .controls input[type="range"]{width:100%;height:36px;padding:0 8px;cursor:pointer}
+  .controls button:hover{filter:brightness(1.1)}
+  .controls{display:flex;flex-direction:column;gap:14px}
+  .note{color:var(--muted);font-size:13px}
+  .log{height:220px;overflow:auto;background:#101233;border:1px solid #2a2f63;border-radius:10px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;white-space:pre-wrap}
+  .players{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .player{border:1px solid #30377a;background:#15183a;border-radius:12px;padding:10px}
+  .player h3{margin:0 0 6px 0;font-size:14px}
+  .status{font-size:12px;color:var(--muted)}
+  .seals{margin:6px 0 2px 0}
+  .seal{display:inline-block;font-size:16px;margin-right:2px}
+  .seal.empty{opacity:.35}
+  .cards{display:flex;gap:8px;flex-wrap:wrap}
+  .card{width:110px;aspect-ratio:2.5/3.5;border-radius:12px;border:2px solid #39408a;background:linear-gradient(135deg,#222656,#0f1231);position:relative;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.4);display:flex;flex-direction:column;justify-content:space-between}
+  .card .v{position:absolute;top:6px;left:6px;background:#000b;color:#fff;border:1px solid #ffffff33;padding:2px 8px;border-radius:10px;font-weight:900;font-size:22px;line-height:1;letter-spacing:.5px;box-shadow:0 0 0 2px #0004}
+  .card .name{padding:10px 8px 4px 8px;font-weight:800;font-size:14px;letter-spacing:.3px}
+  .card .desc{padding:0 8px 10px 8px;color:#c9cff7;font-size:12px}
+  .card.guard{border-color:#7c8cff}
+  .card.priest{border-color:#a6d1ff}
+  .card.baron{border-color:#83ffd4}
+  .card.handmaid{border-color:#ffd166}
+  .card.prince{border-color:#ff9bb3}
+  .card.king{border-color:#b699ff}
+  .card.countess{border-color:#ffcf7c}
+  .card.princess{border-color:#ff6b94}
+  .card.hidden{border-color:var(--backBorder)!important;background:linear-gradient(135deg,var(--back1),var(--back2))!important}
+  .card.hidden .v,.card.hidden .name,.card.hidden .desc{display:none!important}
+  .card.hidden::after{content:"🂠";position:absolute;inset:0;display:grid;place-items:center;font-size:40px;opacity:.9}
+  .tag{display:inline-block;padding:2px 6px;border-radius:8px;background:#27308a;color:#cfe0ff;border:1px solid #3a45a6;font-size:11px;margin-right:6px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{background:var(--accent);color:#2a1600;border:none;border-radius:10px;padding:8px 10px;font-weight:800;cursor:pointer}
+  .btn.secondary{background:#2a2f63;color:#e9ecff;border:1px solid #3a45a6}
+  .btn.danger{background:var(--danger);color:#fff}
+  .btn.active{outline:2px solid var(--accent2)}
+  .center{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .stack{display:flex;gap:6px;align-items:center}
+  .pill{border:1px solid #3a45a6;background:#11143a;color:#cfe0ff;padding:4px 8px;border-radius:999px;font-size:12px}
+  .deck{width:84px;height:120px;border-radius:10px;border:2px dashed #3a45a6;display:grid;place-items:center}
+  .deck b{font-size:12px;color:#9fb0ff}
+  .hr{height:1px;background:#2a2f63;margin:4px 0 8px 0}
+
+  /* === ACTION BAR (fixe, une ligne, cartes côte à côte) === */
+  #humanActions{position:sticky;top:0;z-index:5;display:flex;flex-direction:row;align-items:flex-start;gap:10px;flex-wrap:nowrap;overflow-x:auto;padding:8px;border:1px solid #3a45a6;background:#121433cc;border-radius:10px;backdrop-filter:blur(4px)}
+  #humanActions .btn{flex:0 0 auto;white-space:nowrap}
+  .actionItem{flex:0 0 auto;display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:160px;max-width:200px;padding:8px;border:1px solid #3a45a6;border-radius:10px;background:#0f1231cc}
+  .actionItem .chip{align-self:flex-start}
+  .actionItem .btn{width:100%}
+  .actionItem select{width:100%}
+  .actionItem.disabled{opacity:.6}
+  .chip{display:inline-block;padding:2px 10px;border-radius:999px;border:2px solid #3a45a6;font-weight:800}
+
+  .chip.guard,.actionItem.guard{border-color:#7c8cff}
+  .chip.priest,.actionItem.priest{border-color:#a6d1ff}
+  .chip.baron,.actionItem.baron{border-color:#83ffd4}
+  .chip.handmaid,.actionItem.handmaid{border-color:#ffd166}
+  .chip.prince,.actionItem.prince{border-color:#ff9bb3}
+  .chip.king,.actionItem.king{border-color:#b699ff}
+  .chip.countess,.actionItem.countess{border-color:#ffcf7c}
+  .chip.princess,.actionItem.princess{border-color:#ff6b94}
+
+  .footer{padding:10px;color:#8fa0ff;text-align:center}
+  .leaderboard{border:1px solid #2a2f63;border-radius:10px;padding:8px;background:#101233;margin-top:8px}
+  .leaderboard .rowLB{display:flex;justify-content:space-between;margin:2px 0}
+  .leaderboard .me{color:#ffd166;font-weight:700}
+  /* --- Discards thumbnails (vignettes) --- */
+  .player .meta{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .discards{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:55%}
+  .thumb{width:56px;aspect-ratio:2.5/3.5;border-radius:8px;background:linear-gradient(135deg,#222656,#0f1231);border:2px solid #39408a;position:relative;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+  .thumb .v{position:absolute;top:2px;left:4px;background:#000b;color:#fff;border:1px solid #ffffff33;padding:1px 6px;border-radius:8px;font-weight:900;font-size:18px;line-height:1;letter-spacing:.3px}
+  .thumb .name{position:absolute;bottom:3px;left:4px;right:4px;color:#e8ebff;font-weight:800;font-size:10px;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .thumb.guard{border-color:#7c8cff}
+  .thumb.priest{border-color:#a6d1ff}
+  .thumb.baron{border-color:#83ffd4}
+  .thumb.handmaid{border-color:#ffd166}
+  .thumb.prince{border-color:#ff9bb3}
+  .thumb.king{border-color:#b699ff}
+  .thumb.countess{border-color:#ffcf7c}
+  .thumb.princess{border-color:#ff6b94}
+
+  /* === Modal (règles) === */
+  .modalBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:9999}
+  .modal{background:#15183a;border:1px solid #3a45a6;border-radius:12px;padding:16px;width:min(680px,92vw);max-height:85vh;overflow:auto;color:var(--text)}
+  .modal h3{margin:0 0 10px 0}
+  .modal .btnRow{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  .modal .rule{display:flex;align-items:flex-start;gap:8px;margin:6px 0}
+  .modal .rule b{min-width:28px;text-align:center;border:1px solid #3a45a6;border-radius:6px;padding:2px 6px;background:#101233}
+</style>
+</head>
+<body>
+<header>
+  <h1>💌 Love Letter <span class="badge">Solo vs IA</span></h1>
+  <div class="topbar">
+    <div class="stack"><span class="pill" id="turnInfo">–</span><span class="pill" id="roundInfo">–</span><span class="pill" id="deckInfo">–</span><span class="pill" id="goalInfo">Objectif : –</span></div>
+    <div class="row">
+      <button class="btn secondary" id="btnRestart">🔁 Nouvelle manche</button>
+      <button class="btn danger" id="btnResetScores">🧹 Réinitialiser scores</button>
+      <button class="btn secondary" id="btnRules">📜 Règles (résumé)</button>
+    </div>
+  </div>
+</header>
+<main>
+  <section class="panel left">
+    <div class="controls">
+      <div>
+        <label>Nombre total de joueurs (toi inclus) :</label>
+        <select id="playerCount">
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+      <div>
+        <label>Ton pseudo :</label>
+        <input id="playerName" value="Toi" class="controls" style="padding:8px 10px;border-radius:8px;border:1px solid #3a45a6;background:#101233;color:#e9ecff;width:100%"/>
+      </div>
+      <div>
+        <label>Difficulté IA : <b id="aiLevelLabel">Normal</b></label>
+        <input id="aiLevel" type="range" min="1" max="3" step="1" value="2" />
+        <div class="note">1 = Facile • 2 = Normal • 3 = Difficile</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnStart">▶️ Lancer la partie</button>
+      </div>
+      <div class="hr"></div>
+      <div id="note" class="note">Pions de faveur : le premier à atteindre l’objectif gagne la partie complète (2j :7 • 3j :5 • 4j :4). Les IA voient les cartes <b>dos caché</b>. Tie-break : carte en main → somme des défausses → égalité parfaite.</div>
+      <div class="leaderboard" id="leaderboard"></div>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="center">
+      <div class="topbar">
+        <div class="deck" title="Pioche"><b id="deckCount">–</b></div>
+        <div class="guess" id="humanActions" style="display:none"></div>
+      </div>
+      <div class="players" id="players"></div>
+    </div>
+  </section>
+</main>
+<div class="footer">Fichier HTML autonome – aucune connexion requise. Jeu inspiré de Love Letter® (Alderac/Seiji Kanai) – version fan solo non-officielle.</div>
+<script>
+(function(){
+  // ====== DOM refs ======
+  const logEl = document.getElementById('log');
+  const playersEl = document.getElementById('players');
+  const deckCountEl = document.getElementById('deckCount');
+  const deckInfo = document.getElementById('deckInfo');
+  const turnInfo = document.getElementById('turnInfo');
+  const roundInfo = document.getElementById('roundInfo');
+  const goalInfo = document.getElementById('goalInfo');
+  const actionsEl = document.getElementById('humanActions');
+  const aiLevelEl = document.getElementById('aiLevel');
+  const aiLevelLabel = document.getElementById('aiLevelLabel');
+
+  // ===== Helpers robustes d'index =====
+  function isValidIndex(i){ return Number.isInteger(i) && i>=0 && i<(state.players?.length||0); }
+  function firstAliveIndex(){ const n=state.players?.length||0; for(let i=0;i<n;i++){ const p=state.players[i]; if(p && !p.out) return i; } return -1; }
+  function ensureCurrentIndex(){ const n=state.players?.length||0; if(n===0){ state.current=0; return; } if(!isValidIndex(state.current) || state.players[state.current]?.out){ const idx=firstAliveIndex(); state.current = (idx>=0? idx : 0); } }
+
+  // --- Tests intégrés (exécuter ?test=1 ou window.runTests()) ---
+  function runTests(){
+    const results=[]; const errs=[]; const ok=(name,cond)=> (cond?results:errs).push(name);
+    // DOM
+    ok('#log exists', !!document.getElementById('log'));
+    ok('#players exists', !!document.getElementById('players'));
+    ok('#deckCount exists', !!document.getElementById('deckCount'));
+    ok('#btnStart exists', !!document.getElementById('btnStart'));
+    ok('#btnRestart exists', !!document.getElementById('btnRestart'));
+    ok('#btnResetScores exists', !!document.getElementById('btnResetScores'));
+    ok('#btnRules exists', !!document.getElementById('btnRules'));
+    ok('#playerCount exists', !!document.getElementById('playerCount'));
+    ok('#playerName exists', !!document.getElementById('playerName'));
+    ok('#goalInfo exists', !!document.getElementById('goalInfo'));
+    ok('#aiLevel exists', !!document.getElementById('aiLevel'));
+    // Pure
+    ok('targetFor(2)=7', targetFor(2)===7);
+    ok('targetFor(3)=5', targetFor(3)===5);
+    ok('targetFor(4)=4', targetFor(4)===4);
+    const dk=buildDeck(); ok('deck size 16', dk.length===16);
+    const counts=dk.reduce((m,c)=>{m[c.id]=(m[c.id]||0)+1; return m;},{});
+    ok('5 guards', counts.guard===5);
+    ok('2 priests', counts.priest===2);
+    ok('2 barons', counts.baron===2);
+    ok('2 handmaids', counts.handmaid===2);
+    ok('2 princes', counts.prince===2);
+    ok('1 king', counts.king===1);
+    ok('1 countess', counts.countess===1);
+    ok('1 princess', counts.princess===1);
+    // Sécurisation de l'index courant
+    const backupState = state;
+    state = {players:[{id:0,out:false},{id:1,out:false}], current:99}; ensureCurrentIndex(); ok('ensureCurrentIndex clamps to 0', state.current===0);
+    state = {players:[{id:0,out:true},{id:1,out:false}], current:0}; ensureCurrentIndex(); ok('ensureCurrentIndex finds first alive (1)', state.current===1);
+    state = {players:[], current:5}; ensureCurrentIndex(); ok('ensureCurrentIndex with empty players -> 0', state.current===0);
+    state = backupState;
+    // UI helpers & action item tests
+    const bak=state; state={players:[{id:0,out:false,protected:false,isHuman:false},{id:1,out:false,protected:true,isHuman:true},{id:2,out:false,protected:false,isHuman:true}], current:0};
+    const selA=mkTargetSelect(0,false); ok('mkTargetSelect excludes self when !allowSelf', ![...selA.options].some(o=>parseInt(o.value,10)===0));
+    const selB=mkTargetSelect(0,true); ok('mkTargetSelect allows self when allowSelf', [...selB.options].some(o=>parseInt(o.value,10)===0));
+    const gSel=mkGuessSelect(); ok('mkGuessSelect excludes guard', ![...gSel.options].some(o=>o.value==='guard'));
+    ok('buildActionItem function', typeof buildActionItem==='function');
+    const tmp=buildActionItem({id:0,isHuman:true,hand:[]},{id:'guard',name:'Garde',value:1,cls:'guard',uid:'t#1'});
+    ok('action item has Jouer', tmp.querySelector('button') && tmp.querySelector('button').textContent==='Jouer');
+    ok('action item has target select', !!tmp.querySelector('select[data-kind="target"]'));
+    ok('action item has guess select', !!tmp.querySelector('select[data-kind="guess"]'));
+    // Difficulty wiring
+    aiLevelEl.value='3'; setDifficultyFromUI(); ok('difficulty set to 3 (Difficile)', state.difficulty===3 && aiLevelLabel.textContent==='Difficile');
+    // Smart helpers
+    const aiplayer={id:0,isHuman:false,hand:[]};
+    const guess=guardGuessSmart(aiplayer); ok('guardGuessSmart valid & not guard', !!CARD_SET.find(c=>c.id===guess) && guess!=='guard');
+    const targ=pickTargetSmart({id:0},'guard'); ok('pickTargetSmart returns someone', !!targ);
+    // Règles modal
+    showRulesModal(); ok('rules modal opens', !!document.getElementById('rulesBackdrop')); closeModal(); ok('rules modal closes', !document.getElementById('rulesBackdrop'));
+    // Leaderboard no-crash + content
+    const savedState = state; const savedScores = (scores||[]).slice(); const savedGoal = goal;
+    state = {players:[{id:0,name:'P1'},{id:1,name:'P2'}]}; scores=[2,1]; goal=5; renderLeaderboard();
+    ok('renderLeaderboard updates DOM', document.getElementById('leaderboard').innerHTML.includes('Classement'));
+    state = savedState; scores = savedScores; goal = savedGoal;
+
+    const summary = `✅ ${results.length} passed, ❌ ${errs.length} failed\n`+ (errs.length?('Failed: '+errs.join(', ')):'All good');
+    console.log('[TESTS]', summary);
+    try{ log(summary);}catch(e){}
+    return {passed:results, failed:errs};
+  }
+  if(new URLSearchParams(location.search).get('test')==='1'){ runTests(); }
+  window.runTests = runTests;
+
+  // ===== Données =====
+  let scores = [];
+  let goal = 0;
+  let lastNames = [];
+  let lastCount = 0;
+
+  const CARD_SET = [
+    {id:'guard', name:'Garde', value:1, count:5, cls:'guard', desc:"Devine la main d'un autre (sauf Garde). S'il a la carte nommée, il est éliminé."},
+    {id:'priest', name:'Prêtre', value:2, count:2, cls:'priest', desc:"Regarde la main d'un autre joueur."},
+    {id:'baron', name:'Baron', value:3, count:2, cls:'baron', desc:"Comparez vos mains, le plus faible est éliminé."},
+    {id:'handmaid', name:'Damoiselle', value:4, count:2, cls:'handmaid', desc:"Immunisé jusqu'à ton prochain tour."},
+    {id:'prince', name:'Prince', value:5, count:2, cls:'prince', desc:"Choisis un joueur (y compris toi) qui défausse sa main et pioche une nouvelle carte."},
+    {id:'king', name:'Roi', value:6, count:1, cls:'king', desc:"Échange ta main avec un autre joueur."},
+    {id:'countess', name:'Comtesse', value:7, count:1, cls:'countess', desc:"Doit être jouée si tu as aussi Roi (6) ou Prince (5)."},
+    {id:'princess', name:'Princesse', value:8, count:1, cls:'princess', desc:"Si tu la défausses ou la joues, tu es éliminé."}
+  ];
+
+  let state = {};
+
+  // ===== Utilitaires =====
+  function log(msg){ if(!logEl) return; logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+  function targetFor(n){ return n===2?7 : n===3?5 : 4; }
+  function buildDeck(){ const deck=[]; CARD_SET.forEach(c=>{for(let i=0;i<c.count;i++){deck.push({...c, uid:c.id+"#"+i});}}); shuffle(deck); return deck; }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } }
+  function diffName(v){ return v===1?'Facile':(v===3?'Difficile':'Normal'); }
+  function setDifficultyFromUI(){ const v=parseInt(aiLevelEl?.value||'2',10); if(!state) state={}; state.difficulty=v; if(aiLevelLabel) aiLevelLabel.textContent=diffName(v); }
+
+  // === Comptage des cartes restantes (info publique, pas de triche) ===
+  const baseCounts = CARD_SET.reduce((m,c)=>{ m[c.id]=c.count; return m; },{});
+  function remainingCounts(viewPlayer){
+    const counts = {...baseCounts};
+    for(const pl of (state.players||[])){
+      for(const d of (pl.discards||[])) if(d) counts[d.id] = Math.max(0, (counts[d.id]||0)-1);
+    }
+    for(const r of (state.revealed||[])) if(r) counts[r.id] = Math.max(0,(counts[r.id]||0)-1);
+    if(viewPlayer && Array.isArray(viewPlayer.hand)){
+      for(const h of viewPlayer.hand) if(h) counts[h.id] = Math.max(0,(counts[h.id]||0)-1);
+    }
+    return counts;
+  }
+  function guardGuessSmart(viewPlayer){
+    const counts = remainingCounts(viewPlayer);
+    delete counts.guard; // interdit
+    let bestId=null, bestCount=-1, bestVal=-1;
+    for(const c of CARD_SET){ if(c.id==='guard') continue; const cnt=counts[c.id]||0; if(cnt>bestCount || (cnt===bestCount && c.value>bestVal)){ bestCount=cnt; bestVal=c.value; bestId=c.id; } }
+    return bestId || 'priest';
+  }
+  function pickTargetSmart(from, forCard){
+    const cands = (state.players||[]).filter(p=>!p.out && !p.protected && p.id!==from.id);
+    if(cands.length===0) return null;
+    // priorité: humain d'abord (plus fun), sinon premier
+    cands.sort((a,b)=> (b.isHuman?1:0) - (a.isHuman?1:0));
+    return cands[0] || null;
+  }
+
+  // ===== Démarrage =====
+  function initialStart(){
+    const n = parseInt(document.getElementById('playerCount').value,10);
+    const you = (document.getElementById('playerName').value||'Toi').trim();
+    lastCount = n; lastNames = Array.from({length:n}, (_,i)=> i===0? you : `IA ${i}`);
+    scores = Array.from({length:n}, ()=>0);
+    goal = targetFor(n);
+    goalInfo.textContent = `Objectif : ${goal}`;
+    setDifficultyFromUI();
+    newRound();
+  }
+
+  function newRound(){
+    state = {
+      round: (state.round||0)+1,
+      players: lastNames.map((nm,i)=>({ id:i, name:nm, isHuman:i===0, hand:[], protected:false, out:false, discards:[] })),
+      deck: buildDeck(), burn:null, current:0, revealed:[], over:false,
+      difficulty: parseInt(aiLevelEl?.value||'2',10)
+    };
+    if(lastCount===2){ for(let i=0;i<3;i++){ const c=state.deck.pop(); state.revealed.push(c); } state.burn = state.deck.pop(); }
+    else { state.burn = state.deck.pop(); }
+    for(const p of state.players){ draw(p); }
+    ensureCurrentIndex();
+    render();
+    log(`— Manche ${state.round} — (IA : ${diffName(state.difficulty)})`);
+    log(lastCount===2? `Rappel: à 2 joueurs, 3 cartes défaussées face visible: ${state.revealed.map(c=>c.name).join(', ')}.`: `Une carte écartée face cachée.`);
+    setTimeout(takeTurn, 400);
+  }
+
+  function draw(p){ if(state.deck.length){ p.hand.push(state.deck.pop()); } }
+
+  function nextAliveIndex(from){
+    const n = state.players.length;
+    if(n===0) return 0;
+    const start = Number.isInteger(from) ? from : -1;
+    for(let i=1;i<=n;i++){
+      const idx = ((start+i)%n + n)%n;
+      const pl = state.players[idx];
+      if(pl && !pl.out) return idx;
+    }
+    return start>=0? (start%n+n)%n : 0;
+  }
+  function alivePlayers(){ return state.players.filter(p=>!p.out); }
+  function enforceCountess(hand){ const hasCountess = hand.some(c=>c.id==='countess'); const hasRoyal = hand.some(c=>c.id==='king'||c.id==='prince'); return hasCountess && hasRoyal; }
+
+  function awardSeals(winners){
+    winners.forEach(w=>{ scores[w.id] = (scores[w.id]||0)+1; });
+    winners.forEach(w=>{ log(`💗 ${w.name} gagne 1 pion de faveur (${scores[w.id]}/${goal}).`); });
+    const champion = state.players.find(p=> (scores[p.id]||0) >= goal );
+    if(champion){ log(`🏅 ${champion.name} remporte la partie (objectif ${goal}).`); alert(`${champion.name} remporte la partie !\nScore: ${scores.map((s,i)=>state.players[i].name+": "+s).join('\n')}`); }
+  }
+
+  function endCheck(){
+    const alive = alivePlayers();
+    if(alive.length<=1){
+      const winner = alive[0];
+      state.over=true;
+      if(winner){ log(`🏆 ${winner.name} gagne: dernier en lice.`); awardSeals([winner]); }
+      else { log(`🏁 Manche terminée.`); }
+      render();
+      return true;
+    }
+    if(state.deck.length===0){
+      let best=-1, contenders=[];
+      for(const p of alive){ const v=p.hand[0]?.value||0; if(v>best){ best=v; contenders=[p]; } else if(v===best){ contenders.push(p); } }
+      state.over=true;
+      if(contenders.length===1){ const w=contenders[0]; log(`🏆 ${w.name} gagne au décompte (plus forte carte: ${w.hand[0].name} ${w.hand[0].value}).`); awardSeals([w]); }
+      else {
+        const sums = contenders.map(p=>({ p, sum: p.discards.reduce((a,c)=>a+((c&&c.value)||0),0) }));
+        const maxSum = Math.max(...sums.map(s=>s.sum));
+        const bests = sums.filter(s=>s.sum===maxSum).map(s=>s.p);
+        if(bests.length===1){ const w=bests[0]; log(`⚖️ Égalité sur la carte. Départage aux défausses: ${w.name} l'emporte (${maxSum}).`); awardSeals([w]); }
+        else { log(`🤝 Égalité parfaite après départage: ${bests.map(b=>b.name).join(', ')}.`); awardSeals(bests); }
+      }
+      render();
+      return true;
+    }
+    return false;
+  }
+
+  function takeTurn(){
+    if(state.over) return;
+    ensureCurrentIndex();
+    const p = state.players[state.current];
+    if(!p){ log('⛔ Aucun joueur actif.'); state.over=true; render(); return; }
+    if(p.protected){ p.protected=false; log(`🛡️ ${p.name} n'est plus protégé(e).`); }
+    draw(p); render(); if(endCheck()) return;
+    if(p.isHuman){ humanTurn(p); } else { setTimeout(()=>aiTurn(p),450); }
+  }
+
+  // === ACTIONS: 1 bouton « Jouer » par carte, sélecteurs en dessous si besoin ===
+  function humanTurn(p){
+    actionsEl.style.display='flex';
+    actionsEl.innerHTML='';
+    const mustCountess=enforceCountess(p.hand);
+    const playable = mustCountess ? p.hand.filter(c=>c.id==='countess') : p.hand;
+    playable.forEach(card=>{ actionsEl.appendChild(buildActionItem(p, card)); });
+  }
+
+  function buildActionItem(p, card){
+    const item=document.createElement('div'); item.className=`actionItem ${card.cls}`;
+    const chip=document.createElement('span'); chip.className=`chip ${card.cls}`; chip.textContent=`${card.name} (${card.value})`;
+    const btn=mkBtn('Jouer', ()=>{
+      const opts={};
+      if(['guard','priest','baron','king','prince'].includes(card.id)){
+        const tSel=item.querySelector('select[data-kind="target"]');
+        if(!tSel || tSel.options.length===0){ log('Aucune cible valide.'); return; }
+        opts.target=parseInt(tSel.value,10);
+      }
+      if(card.id==='guard'){
+        const gSel=item.querySelector('select[data-kind="guess"]');
+        if(!gSel){ log('Choisis une carte à deviner.'); return; }
+        opts.guess=gSel.value;
+      }
+      playCard(p, card, true, opts);
+    });
+    // Sélecteurs dessous
+    item.appendChild(chip);
+    item.appendChild(btn);
+    if(['guard','priest','baron','king','prince'].includes(card.id)){
+      const tSel=mkTargetSelect(p.id, card.id==='prince'); tSel.dataset.kind='target'; item.appendChild(tSel);
+      if(tSel.options.length===0){ btn.disabled=true; item.classList.add('disabled'); }
+    }
+    if(card.id==='guard'){
+      const gSel=mkGuessSelect(); gSel.dataset.kind='guess'; item.appendChild(gSel);
+    }
+    return item;
+  }
+
+  function mkBtn(label, fn){ const b=document.createElement('button'); b.className='btn'; b.textContent=label; b.onclick=fn; return b; }
+  function mkTargetSelect(fromId, allowSelf=false){ const sel=document.createElement('select'); const options=state.players.filter(p=> (!p.out && !p.protected && p.id!==fromId) || (allowSelf && p.id===fromId && !p.out) ).map(p=>p.id); for(const id of options){ const o=document.createElement('option'); o.value=id; o.textContent=state.players[id].name; sel.appendChild(o);} return sel; }
+  function mkGuessSelect(){ const sel=document.createElement('select'); CARD_SET.filter(c=>c.id!=='guard').forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=`${c.name} (${c.value})`; sel.appendChild(o); }); return sel; }
+
+  function discard(p, card){ const idx=p.hand.findIndex(c=>c.uid===card.uid); if(idx>=0) p.hand.splice(idx,1); p.discards.push(card); }
+  function eliminate(p, reason){ p.out=true; p.protected=false; log(`❌ ${p.name} est éliminé(e) ${reason?`(${reason})`:''}.`); }
+
+  function playCard(p, card, isHuman=false, opts={}){
+    if(state.over) return;
+    if(isHuman||!p.isHuman){ if(enforceCountess(p.hand) && card.id!=='countess'){ log(`⚠️ Comtesse obligatoire !`); return; } }
+    discard(p, card); log(`▶️ ${p.name} joue ${card.name} (${card.value}).`);
+
+    switch(card.id){
+      case 'guard': { const target=state.players[opts.target]; if(!target || target.protected || target.out){ log(`La cible est invalide/protégée.`); break; } const guess=opts.guess||randomGuess(); const has=target.hand.some(c=>c.id===guess); log(`🕵️ ${p.name} soupçonne ${target.name} d'avoir « ${cardName(guess)} ». ${has?'✅ Bingo !':'❌ À côté.'}`); if(has){ eliminate(target,'dévoilé par la Garde'); } break; }
+      case 'priest': { const target=state.players[opts.target]; if(!target || target.protected || target.out){ log(`Cible invalide/protégée.`); break; } if(p.isHuman){ alert(`${target.name} a: ${target.hand.map(h=>h.name+" ("+h.value+")").join(', ')}`); } else { log(`👁️ ${p.name} jette un œil à la main de ${target.name}.`); } break; }
+      case 'baron': { const target=state.players[opts.target]; if(!target || target.protected || target.out){ log(`Cible invalide/protégée.`); break; } const v1=p.hand[0]?.value||0; const v2=target.hand[0]?.value||0; log(`⚖️ Duel: ${p.name} (${v1}) vs ${target.name} (${v2}).`); if(v1>v2) eliminate(target,'battu au duel'); else if(v2>v1) eliminate(p,'battu au duel'); else log('Égalité: personne éliminé.'); break; }
+      case 'handmaid': { p.protected=true; log(`🛡️ ${p.name} est protégé(e) jusqu'à son prochain tour.`); break; }
+      case 'prince': { const target=state.players[opts.target]; if(!target || target.out){ log('Cible invalide.'); break; } if(target.protected){ log(`${target.name} est protégé(e).`); break; } const dumped=target.hand.shift(); target.discards.push(dumped); log(`🗑️ ${target.name} défausse ${dumped?dumped.name:'rien'}.`); if(dumped && dumped.id==='princess'){ eliminate(target,'a défaussé la Princesse'); break; } draw(target); break; }
+      case 'king': { const target=state.players[opts.target]; if(!target || target.protected || target.out){ log('Cible invalide/protégée.'); break; } const tmp=target.hand; target.hand=p.hand; p.hand=tmp; log(`🔁 ${p.name} échange sa main avec ${target.name}.`); break; }
+      case 'countess': { break; }
+      case 'princess': { eliminate(p,'a joué/défaussé la Princesse'); break; }
+    }
+    render(); if(endCheck()) return; state.current = nextAliveIndex(state.current); setTimeout(takeTurn,500);
+  }
+
+  function randomGuess(){ const pool=CARD_SET.filter(c=>c.id!=='guard'); const pick=pool[Math.floor(Math.random()*pool.length)]; return pick.id; }
+  function pickTarget(from){ const choices=state.players.filter(p=>!p.out && !p.protected && p.id!==from.id); if(choices.length===0) return null; return choices[Math.floor(Math.random()*choices.length)]; }
+
+  // ==== IA selon difficulté ====
+  function aiTurn(p){
+    const lvl = state.difficulty||2;
+    if(lvl===1) return aiTurnEasy(p);
+    if(lvl===3) return aiTurnHard(p);
+    return aiTurnNormal(p);
+  }
+
+  function aiTurnEasy(p){
+    const hand=p.hand.slice().sort((a,b)=>a.value-b.value);
+    const mustCount=enforceCountess(hand);
+    let toPlay=null, opts={};
+    if(mustCount){ toPlay=hand.find(c=>c.id==='countess'); }
+    else {
+      const nonPrincess=hand.filter(c=>c.id!=='princess');
+      toPlay = nonPrincess[Math.floor(Math.random()*nonPrincess.length)] || hand[0];
+      if(['guard','priest','baron','king','prince'].includes(toPlay.id)){
+        const t = pickTarget(p) || p; // un peu maladroit exprès
+        if(t) opts.target = t.id;
+        if(toPlay.id==='guard') opts.guess = randomGuess();
+      }
+    }
+    playCard(p,toPlay,false,opts);
+  }
+
+  function aiTurnNormal(p){
+    const hand=p.hand.slice().sort((a,b)=>a.value-b.value);
+    const mustCount=enforceCountess(hand);
+    let toPlay=null; let opts={};
+    const ids=hand.map(c=>c.id); const has=id=>ids.includes(id);
+
+    if(mustCount){
+      toPlay=hand.find(c=>c.id==='countess');
+    } else {
+      let prio=['guard','handmaid','baron','prince','priest','king','countess'];
+      if(has('princess') && has('baron')){ prio=['baron','guard','handmaid','prince','priest','king','countess']; }
+      else if(has('king') && hand.find(c=>c.id!=='king')?.value<=3){ prio=['king','guard','handmaid','baron','prince','priest','countess']; }
+      else if(has('handmaid') && hand.find(c=>c.id!=='handmaid')?.value<=2){ prio=['handmaid','guard','baron','prince','priest','king','countess']; }
+
+      toPlay = hand.filter(c=>c.id!=='princess').sort((a,b)=> prio.indexOf(a.id)-prio.indexOf(b.id))[0] || hand[0];
+
+      if(['guard','priest','baron','king','prince'].includes(toPlay.id)){
+        let t = toPlay.id==='prince' ? (pickTargetSmart(p,toPlay.id) || p) : pickTargetSmart(p,toPlay.id);
+        if(toPlay.id==='prince' && has('princess') && t && t.id===p.id){
+          // évite de s'auto-cibler avec Princesse en main
+          t = pickTargetSmart(p,toPlay.id);
+        }
+        if(t) opts.target=t.id;
+        if(toPlay.id==='guard') opts.guess = guardGuessSmart(p);
+      }
+    }
+    playCard(p,toPlay,false,opts);
+  }
+
+  function aiTurnHard(p){
+    const hand=p.hand.slice().sort((a,b)=>a.value-b.value);
+    const mustCount=enforceCountess(hand);
+    let toPlay=null; let opts={};
+    const ids=hand.map(c=>c.id); const has=id=>ids.includes(id);
+
+    if(mustCount){ toPlay=hand.find(c=>c.id==='countess'); }
+    else {
+      // Surpondération de Garde si des cartes hautes restent
+      const counts = remainingCounts(p);
+      const highLeft = (counts.princess||0)+(counts.countess||0)+(counts.king||0);
+      let prio=['guard','handmaid','baron','prince','priest','king','countess'];
+      if(highLeft>0) prio=['guard','baron','handmaid','prince','priest','king','countess'];
+      if(has('princess') && has('baron')) prio=['baron','guard','handmaid','prince','priest','king','countess'];
+
+      toPlay = hand.filter(c=>c.id!=='princess').sort((a,b)=> prio.indexOf(a.id)-prio.indexOf(b.id))[0] || hand[0];
+
+      if(['guard','priest','baron','king','prince'].includes(toPlay.id)){
+        let t = toPlay.id==='prince' ? pickTargetSmart(p,toPlay.id) : pickTargetSmart(p,toPlay.id);
+        if(toPlay.id==='prince' && has('princess')){
+          // éviter l'auto-cible 100%
+          if(!t || t.id===p.id) t = pickTargetSmart(p,toPlay.id);
+        }
+        if(t) opts.target=t.id;
+        if(toPlay.id==='guard') opts.guess = guardGuessSmart(p);
+      }
+    }
+    playCard(p,toPlay,false,opts);
+  }
+
+  function cardName(id){ return CARD_SET.find(c=>c.id===id)?.name || id; }
+
+  function renderLeaderboard(){ const lb=document.getElementById('leaderboard'); if(!lb) return; if(!state.players||!state.players.length){ lb.innerHTML=''; return; } const arr=state.players.map(p=>({id:p.id,name:p.name,score:(scores[p.id]||0)})); arr.sort((a,b)=>(b.score-a.score)||a.name.localeCompare(b.name)); let html='<div style="font-weight:700;margin-bottom:6px">Classement</div>'; arr.forEach((e,i)=>{ const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.'; const full=(goal||0); const hearts=(e.score>0?'💗'.repeat(e.score):'') + (full>e.score? '○'.repeat(full - e.score):''); html+=`<div class="rowLB ${e.id===0?'me':''}"><span>${medal} ${e.name}</span><span>${hearts} ${e.score}/${goal||'–'}</span></div>`; }); lb.innerHTML=html; }
+
+  function render(){
+    deckCountEl.textContent = `${state.deck?.length||0}`;
+    if(deckInfo) deckInfo.textContent = `Pioche: ${state.deck?.length||0} cartes`;
+    ensureCurrentIndex();
+    turnInfo.textContent = state.over? 'Manche terminée' : `Tour: ${state.players?.[state.current]?.name||'?'} `;
+    roundInfo.textContent = `Joueurs actifs: ${alivePlayers().length}`;
+    goalInfo.textContent = `Objectif : ${goal||'–'}`;
+
+    renderLeaderboard();
+    playersEl.innerHTML='';
+    for(const p of (state.players||[])){
+      const div=document.createElement('div'); div.className='player';
+      const h=document.createElement('h3'); h.textContent=p.name; div.appendChild(h);
+      const sealsDiv=document.createElement('div'); sealsDiv.className='seals';
+      const got=scores[p.id]||0; const need=goal||0;
+      for(let i=0;i<got;i++){ const s=document.createElement('span'); s.className='seal'; s.textContent='💗'; sealsDiv.appendChild(s); }
+      for(let i=got;i<need;i++){ const s=document.createElement('span'); s.className='seal empty'; s.textContent='○'; sealsDiv.appendChild(s); }
+      div.appendChild(sealsDiv);
+
+      const meta=document.createElement('div'); meta.className='meta';
+      const st=document.createElement('div'); st.className='status'; st.textContent = `${p.out? 'Éliminé' : (p.protected? 'Protégé' : 'En jeu')}`;
+      const df=document.createElement('div'); df.className='discards';
+      p.discards.filter(Boolean).slice(-12).forEach(c=>{ const t=document.createElement('div'); t.className=`thumb ${c.cls}`; t.title=`${c.name} (${c.value})`; t.innerHTML=`<span class="v">${c.value}</span><div class="name">${c.name}</div>`; df.appendChild(t); });
+      meta.appendChild(st); meta.appendChild(df); div.appendChild(meta);
+
+      const cards=document.createElement('div'); cards.className='cards';
+      p.hand.forEach(c=>{ const cd=document.createElement('div'); cd.className=`card ${c.cls} ${(!p.isHuman)?'hidden':''}`; cd.innerHTML=`<span class="v">${c.value}</span><div class="name">${c.name}</div><div class="desc">${c.desc}</div>`; cards.appendChild(cd); });
+      if(p.isHuman){ const acts=document.createElement('div'); acts.className='actions'; const mustCount=enforceCountess(p.hand); if(mustCount){ const a=document.createElement('span'); a.className='tag'; a.textContent='Comtesse obligatoire'; acts.appendChild(a);} if(state.players[state.current]===p && !state.over){ const a=document.createElement('span'); a.className='tag'; a.textContent='À toi de jouer'; acts.appendChild(a);} div.appendChild(acts); }
+      div.appendChild(cards); playersEl.appendChild(div);
+    }
+  }
+
+  // ====== Règles modal ======
+  function openModal(content){
+    closeModal();
+    const backdrop=document.createElement('div');
+    backdrop.className='modalBackdrop';
+    backdrop.id='rulesBackdrop';
+    backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
+    const box=document.createElement('div');
+    box.className='modal';
+    if(typeof content==='string'){ box.innerHTML=content; } else { box.appendChild(content); }
+    backdrop.appendChild(box);
+    document.body.appendChild(backdrop);
+    document.addEventListener('keydown', escCloser);
+  }
+  function closeModal(){ const b=document.getElementById('rulesBackdrop'); if(b) b.remove(); document.removeEventListener('keydown', escCloser); }
+  function escCloser(e){ if(e.key==='Escape') closeModal(); }
+  function showRulesModal(){
+    const html = `
+      <h3>📜 Règles (résumé)</h3>
+      <div class="rule">• 16 cartes : 5 Gardes(1), 2 Prêtres(2), 2 Barons(3), 2 Damoiselles(4), 2 Princes(5), 1 Roi(6), 1 Comtesse(7), 1 Princesse(8).</div>
+      <div class="rule">• À ton tour : pioche, garde 2 cartes, <b>joue-en 1</b> et applique son effet.</div>
+      <div class="rule">• <b>4 Damoiselle</b> : protégé jusqu’à ton prochain tour.</div>
+      <div class="rule">• <b>7 Comtesse</b> : <i>doit</i> être jouée si tu as aussi 5 Prince ou 6 Roi.</div>
+      <div class="rule">• <b>8 Princesse</b> : si tu la joues/défausses, tu es éliminé.</div>
+      <div class="rule">• Fin de manche : dernier en lice, ou si la pioche est vide → plus forte carte en main.</div>
+      <div class="rule">• Tie-break : carte en main → somme des défausses → égalité parfaite (pions partagés).</div>
+      <div class="rule">• Pions de faveur (objectif partie) : 2 joueurs = 7, 3 joueurs = 5, 4 joueurs = 4.</div>
+      <div class="btnRow">
+        <button class="btn secondary" id="btnCloseRules">Fermer</button>
+      </div>`;
+    openModal(html);
+    document.getElementById('btnCloseRules')?.addEventListener('click', closeModal);
+  }
+
+  // ===== UI wiring =====
+  document.getElementById('btnStart').addEventListener('click', ()=>{ if(logEl) logEl.textContent=''; initialStart(); });
+  document.getElementById('btnRestart').addEventListener('click', ()=>{ if(logEl) logEl.textContent=''; if(lastCount>0 && lastNames.length===lastCount) newRound(); else initialStart(); });
+  document.getElementById('btnResetScores').addEventListener('click', ()=>{ if(lastCount>0){ scores=Array.from({length:lastCount}, ()=>0); log('🧹 Scores remis à zéro.'); render(); }});
+  document.getElementById('btnRules').addEventListener('click', showRulesModal);
+  aiLevelEl.addEventListener('input', setDifficultyFromUI);
+
+  // Expose helpers pour debug/tests
+  window.buildActionItem = buildActionItem;
+  window.showTargetPanel = function(){}; // compat stub
+  window.showRulesModal = showRulesModal;
+  window.closeModal = closeModal;
+  window.guardGuessSmart = guardGuessSmart;
+  window.pickTargetSmart = pickTargetSmart;
+  window.setDifficultyFromUI = setDifficultyFromUI;
+})();
+</script>
+</body>
+</html>
